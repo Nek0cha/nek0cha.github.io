@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>原神 | 七聖召喚ダイスロール</title>
+  <link rel="icon" href="./favicon.ico">
+  <style>
+    @font-face {
+    font-family: 'GiFont'; 
+    src: url('ja-jp.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    }
+
+    * {
+      font-family: 'GiFont', sans-serif;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f4f4f4;
+    }
+
+    .container {
+      text-align: center;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 600px; 
+    }
+
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .controls button {
+      padding: 10px 15px;
+      margin: 0; 
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px; 
+      flex-grow: 1;
+      min-width: 120px;
+    }
+
+    #rollButton {
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      flex-grow: 2; 
+    }
+
+    #rerollSelectedButton {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    #discardSelectedButton {
+      background-color: #f44336;
+      color: white;
+    }
+    
+    #resetAllButton {
+        background-color: #607D8B;
+        color: white;
+    }
+
+    #rollButton:disabled,
+    #rerollSelectedButton:disabled,
+    #discardSelectedButton:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .dice-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr); 
+      grid-template-rows: repeat(2, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .die-wrapper {
+      width: 100%;
+      padding-top: 100%;
+      position: relative;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      overflow: hidden;
+    }
+    
+    .die-wrapper-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .die-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .die-wrapper.selected {
+      border-color: #FFC107;
+      opacity: 0.7;
+      box-shadow: 0 0 10px rgba(255, 193, 7, 0.8);
+    }
+
+    .die-wrapper.discarded {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    #message {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #333;
+      min-height: 20px; 
+    }
+  </style>
+  <script>
+    const DICE_COUNT = 8;     // ダイスの数
+    const DICE_FACES = 8;     // ダイスの面数 (1～8)
+    const MAX_REROLLS = 1;    // 最大リロール回数
+
+    let diceValues = [];      // 各ダイスの現在の値
+    let rerollCount = 0;      // 現在のリロール回数
+    let isFirstRollComplete = false; // 初回ロールが完了したかを示す状態変数
+    let hasDiscarded = false;        // 捨てる操作が行われたかどうか
+
+    let diceContainer;
+    let rollButton;
+    let rerollSelectedButton;
+    let discardSelectedButton;
+    let resetAllButton; 
+    let messageElement;
+
+
+    function rollDie() {
+      return Math.floor(Math.random() * DICE_FACES) + 1;
+    }
+
+    /**
+    * @param {number} value - ダイスの出目
+    */
+    function getDiceImagePath(value) {
+      return `images/dice_${value}.png`;
+    }
+    
+    function getNoneImagePath() {
+        return `images/none.png`;
+    }
+    
+    function initializeDice() {
+      diceContainer = document.getElementById('diceContainer');
+      rollButton = document.getElementById('rollButton');
+      rerollSelectedButton = document.getElementById('rerollSelectedButton');
+      discardSelectedButton = document.getElementById('discardSelectedButton');
+      resetAllButton = document.getElementById('resetAllButton'); 
+      messageElement = document.getElementById('message');
+
+      diceContainer.innerHTML = '';
+      diceValues = [];
+      for (let i = 0; i < DICE_COUNT; i++) {
+        const initialValue = 0;
+        diceValues.push(initialValue);
+
+        const dieWrapper = document.createElement('div');
+        dieWrapper.classList.add('die-wrapper');
+        dieWrapper.dataset.index = i;
+
+        const dieInner = document.createElement('div');
+        dieInner.classList.add('die-wrapper-inner');
+        
+        const dieImage = document.createElement('img');
+        dieImage.src = getNoneImagePath();
+        dieImage.alt = `Die ${i + 1} - Unrolled`;
+        
+        dieInner.appendChild(dieImage);
+        dieWrapper.appendChild(dieInner);
+        diceContainer.appendChild(dieWrapper);
+
+        dieWrapper.addEventListener('click', toggleDiceSelection);
+      }
+      
+      rerollCount = 0;
+      isFirstRollComplete = false;
+      hasDiscarded = false; 
+      rollButton.disabled = false;
+      
+      updateControlButtons();
+    }
+
+
+    function rollAllDice() {
+      const dieWrappers = diceContainer.querySelectorAll('.die-wrapper');
+      
+      if (isFirstRollComplete) {
+          messageElement.textContent = '初回ロールは既に完了しています。振り直すには「リロール」か「すべてリセット」を使用してください。';
+          return;
+      }
+      
+      dieWrappers.forEach((wrapper, index) => {
+        if (wrapper.classList.contains('discarded')) {
+          return;
+        }
+
+        // 振る
+        const newValue = rollDie();
+        diceValues[index] = newValue;
+
+        // 表示更新
+        const image = wrapper.querySelector('img');
+        image.src = getDiceImagePath(newValue);
+        image.alt = `Die ${index + 1} with value ${newValue}`;
+
+        // 選択状態を解除
+        wrapper.classList.remove('selected');
+      });
+      
+      isFirstRollComplete = true;
+      rollButton.disabled = true; // 初回ロール後、全て振るボタンは無効に
+
+      rerollCount = 0; 
+      updateControlButtons();
+      displayCurrentResult();
+      messageElement.textContent = `ダイスをすべて振りました。リロールは${MAX_REROLLS}回まで可能です。`;
+    }
+
+    function toggleDiceSelection(event) {
+      const dieWrapper = event.currentTarget;
+
+      if (!isFirstRollComplete || dieWrapper.classList.contains('discarded')) {
+        messageElement.textContent = isFirstRollComplete 
+            ? 'このダイスは捨てられています。'
+            : '最初に「全て振る」ボタンを押してください。';
+        return;
+      }
+
+      dieWrapper.classList.toggle('selected');
+      updateControlButtons();
+      
+      if (messageElement.textContent.includes('振り直すには') || messageElement.textContent.includes('最初に「全て振る」')) {
+        messageElement.textContent = '';
+      }
+    }
+
+    function rerollSelectedDice() {
+      if (!isFirstRollComplete) {
+          messageElement.textContent = '最初に「全て振る」ボタンを押してください。';
+          return;
+      }
+      
+      if (hasDiscarded) {
+          messageElement.textContent = '捨てる操作を行ったため、リロールはできません。';
+          return;
+      }
+      
+      if (rerollCount >= MAX_REROLLS) {
+        messageElement.textContent = `リロールは${MAX_REROLLS}回までです。`;
+        return;
+      }
+
+      const selectedWrappers = diceContainer.querySelectorAll('.die-wrapper.selected:not(.discarded)');
+      if (selectedWrappers.length === 0) {
+        messageElement.textContent = '振り直すダイスを選択してください。';
+        return;
+      }
+
+      selectedWrappers.forEach(wrapper => {
+        const index = parseInt(wrapper.dataset.index);
+
+        // 振る
+        const newValue = rollDie();
+        diceValues[index] = newValue;
+
+        // 表示更新
+        const image = wrapper.querySelector('img');
+        image.src = getDiceImagePath(newValue);
+        image.alt = `Die ${index + 1} with value ${newValue}`;
+
+        // 選択状態を解除
+        wrapper.classList.remove('selected');
+      });
+
+      rerollCount++;
+      updateControlButtons();
+      displayCurrentResult();
+      messageElement.textContent = `ダイスを振り直しました。残りリロール回数: ${MAX_REROLLS - rerollCount}`;
+    }
+
+    function discardSelectedDice() {
+      if (!isFirstRollComplete) {
+          messageElement.textContent = '最初に「全て振る」ボタンを押してください。';
+          return;
+      }
+      
+      const selectedWrappers = diceContainer.querySelectorAll('.die-wrapper.selected:not(.discarded)');
+      if (selectedWrappers.length === 0) {
+        messageElement.textContent = '捨てるダイスを選択してください。';
+        return;
+      }
+
+      selectedWrappers.forEach(wrapper => {
+        wrapper.classList.add('discarded');
+        wrapper.classList.remove('selected');
+      });
+
+      hasDiscarded = true; 
+      
+      updateControlButtons();
+      displayCurrentResult();
+      messageElement.textContent = `${selectedWrappers.length}個のダイスを捨てました。リロールはもうできません。`;
+    }
+    
+    function resetAll() {
+        diceValues.fill(0);
+        rerollCount = 0;
+        isFirstRollComplete = false;
+        hasDiscarded = false; 
+
+        const dieWrappers = diceContainer.querySelectorAll('.die-wrapper');
+        dieWrappers.forEach(wrapper => {
+            const index = parseInt(wrapper.dataset.index);
+            const image = wrapper.querySelector('img');
+
+            image.src = getNoneImagePath();
+            image.alt = `Die ${index + 1} - Unrolled`;
+
+            wrapper.classList.remove('selected', 'discarded');
+        });
+
+        rollButton.disabled = false;
+        updateControlButtons();
+        
+        messageElement.textContent = 'すべてのダイスの状態がリセットされました。';
+    }
+
+    function updateControlButtons() {
+      const selectedCount = diceContainer.querySelectorAll('.die-wrapper.selected:not(.discarded)').length;
+      
+      const canOperate = isFirstRollComplete;
+      
+      const canReroll = canOperate && !hasDiscarded && rerollCount < MAX_REROLLS && selectedCount > 0;
+      const canDiscard = canOperate && selectedCount > 0;
+
+      rerollSelectedButton.disabled = !canReroll;
+      discardSelectedButton.disabled = !canDiscard;
+      
+      if (selectedCount === 0 && canOperate) {
+          rerollSelectedButton.disabled = !canReroll; 
+          discardSelectedButton.disabled = true;
+      } else if (!canOperate) {
+          rerollSelectedButton.disabled = true;
+          discardSelectedButton.disabled = true;
+      }
+
+
+      let rerollText = `リロール (残り${MAX_REROLLS - rerollCount}回)`;
+      if (hasDiscarded) {
+          rerollText = `リロール不可 (捨てる操作済み)`;
+      }
+      rerollSelectedButton.textContent = rerollText;
+    }
+
+    function displayCurrentResult() {
+      let activeDiceValues = [];
+      const dieWrappers = diceContainer.querySelectorAll('.die-wrapper');
+
+      dieWrappers.forEach((wrapper, index) => {
+        if (!wrapper.classList.contains('discarded')) {
+          activeDiceValues.push(diceValues[index]);
+        }
+      });
+
+      const rolledValues = activeDiceValues.filter(v => v > 0);
+      const total = rolledValues.reduce((sum, value) => sum + value, 0);
+
+      let resultText = '';
+      if (rolledValues.length > 0) {
+        resultText = `現在の出目: ${rolledValues.join(', ')} (合計: ${total}) - ${activeDiceValues.length}個のダイスが残っています。`;
+      } else if (isFirstRollComplete && activeDiceValues.length === 0) {
+        resultText = '全てのダイスが捨てられました。';
+      } else {
+         resultText = '「全て振る」ボタンを押して開始してください。';
+      }
+      
+      messageElement.textContent = resultText;
+    }
+
+
+    window.onload = function() {
+        initializeDice();
+        rollButton.addEventListener('click', rollAllDice);
+        rerollSelectedButton.addEventListener('click', rerollSelectedDice);
+        discardSelectedButton.addEventListener('click', discardSelectedDice);
+        resetAllButton.addEventListener('click', resetAll); 
+        
+        displayCurrentResult();
+    };
+  </script>
+</head>
+<body>
+
+  <div class="container">
+    <h1>ダイスロール</h1>
+
+    <div class="controls">
+      <button id="rollButton">全て振る</button>
+      <button id="rerollSelectedButton" disabled>リロール (残り1回)</button>
+      <button id="discardSelectedButton" disabled>捨てる</button>
+      <button id="resetAllButton">すべてリセット</button>
+    </div>
+
+    <div id="diceContainer" class="dice-grid">
+    </div>
+
+    <p id="message"></p>
+  </div>
+
+</body>
+</html>

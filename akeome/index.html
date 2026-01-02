@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>あけおめ！</title>
+    <!-- Tailwind CSSを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <!-- Interフォントの読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=400;700;900&display=swap" rel="stylesheet">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.3.2/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease;
+        }
+
+        #new-year-message {
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 1s ease-out, transform 1s ease-out; 
+            letter-spacing: 0.1em;
+        }
+
+        .show-message {
+            opacity: 1 !important;
+            transform: scale(1) !important;
+        }
+        
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col justify-center items-center p-4">
+
+    <audio id="cracker-sound" preload="auto">
+        <source src="./assets/akeome.wav" type="audio/wav">
+    </audio>
+
+    <div class="text-center">
+        <div id="current-time" class="text-2xl sm:text-4xl font-light text-gray-500 mb-8 select-none">
+            JST: --:--:--
+        </div>
+
+        <div id="countdown-text" class="text-2xl sm:text-4xl font-semibold text-gray-700 mb-12 select-none">
+            カウントダウン中...
+        </div>
+
+        <h1 id="new-year-message" class="text-6xl sm:text-8xl lg:text-9xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-600 p-4 rounded-xl select-none hidden">
+            あけおめ！
+        </h1>
+
+        <div class="mt-12 text-sm text-gray-400">
+            <p>※ 日本時間 (JST) 00:00:00 になるとエフェクトを再生します。</p>
+        </div>
+    </div>
+
+    <script>
+        // --- グローバル変数 ---
+        const crackerSound = document.getElementById('cracker-sound');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const countdownText = document.getElementById('countdown-text');
+        const messageElement = document.getElementById('new-year-message');
+
+        let isNewYear = false;
+        let resetTimer = null; 
+        const RESET_DURATION_MS = 10000;
+
+        function getJSTTime() {
+            const now = new Date();
+            const timeOptions = {
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+                timeZone: 'Asia/Tokyo'
+            };
+            return now.toLocaleTimeString('ja-JP', timeOptions);
+        }
+
+        function resetNewYearEffects() {
+            if (!isNewYear) return; 
+
+            if (resetTimer) clearTimeout(resetTimer);
+
+            messageElement.classList.remove('show-message');
+
+            document.body.classList.remove('bg-indigo-900', 'text-white');
+            document.body.classList.add('bg-gray-100');
+            countdownText.classList.remove('text-yellow-400');
+            countdownText.classList.add('text-gray-700');
+            
+            setTimeout(() => {
+                messageElement.classList.add('hidden'); 
+            }, 1000); 
+
+            isNewYear = false;
+
+            clearInterval(window.clockInterval);
+            window.clockInterval = setInterval(updateClockAndCheckNewYear, 1000); 
+            updateClockAndCheckNewYear(); 
+        }
+
+        function updateClockAndCheckNewYear() {
+            const jstTime = getJSTTime();
+            currentTimeDisplay.textContent = `JST: ${jstTime}`;
+
+            if (jstTime === '00:00:00' && !isNewYear) {
+                isNewYear = true;
+                
+                messageElement.classList.remove('hidden'); 
+                setTimeout(() => {
+                    messageElement.classList.add('show-message'); 
+                }, 10);
+                
+                crackerSound.volume = 0.7;
+                crackerSound.currentTime = 0; 
+                crackerSound.play().catch(error => {
+                    console.warn("error:", error);
+                });
+
+                countdownText.textContent = 'Happy New Year!'; 
+                document.body.classList.add('bg-indigo-900', 'text-white'); 
+                document.body.classList.remove('bg-gray-100');
+                countdownText.classList.remove('text-gray-700');
+                countdownText.classList.add('text-yellow-400');
+                
+                confetti({
+	                particleCount: 100,
+	                spread: 70,
+	                origin: { y: 0.6 }
+	              });
+                
+                resetTimer = setTimeout(resetNewYearEffects, RESET_DURATION_MS);
+
+                clearInterval(window.clockInterval);
+                window.clockInterval = setInterval(updateClockAndCheckNewYear, 5000); 
+            } else if (!isNewYear) {
+                const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+                const midnight = new Date(now);
+                midnight.setDate(now.getDate() + 1);
+                midnight.setHours(0, 0, 0, 0);
+
+                const diff = midnight.getTime() - now.getTime();
+                
+                if (diff > 0) {
+                    const totalSeconds = Math.floor(diff / 1000);
+                    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+                    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+                    const s = String(totalSeconds % 60).padStart(2, '0');
+                    
+                    countdownText.textContent = `0時まであと ${h}時間 ${m}分 ${s}秒`;
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateClockAndCheckNewYear();
+            window.clockInterval = setInterval(updateClockAndCheckNewYear, 1000);
+        });
+
+        document.body.addEventListener('click', () => {
+            if (isNewYear) {
+                if (crackerSound.paused || crackerSound.currentTime === 0) {
+                    crackerSound.play().catch(e => console.log('Playback blocked on user click:', e));
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>
