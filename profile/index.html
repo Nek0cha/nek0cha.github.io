@@ -17,27 +17,10 @@
     alert("👀");
 		});
 		
-		// disallow eight click
+		// disallow right click
 		document.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 		});
-
-			// age reveal function
-		function revealAge() {
-			// First alert
-			if (!confirm("年齢を表示しますか？")) {
-				return; // User cancelled first alert
-			}
-
-			// Second alert
-			// if (!confirm("本当に表示しますか？")) {
-			//	return; // User cancelled second alert
-			// }
-
-			// Both alerts confirmed, show the age
-			document.getElementById('age-link').classList.add('hidden');
-			document.getElementById('age-text').classList.remove('hidden');
-		}
 
 
 	</script>
@@ -64,12 +47,7 @@
 			<div class="text-center">
 				<h2 class="mb-4">詳細</h2>
 				<div class="detail text-left bg-black/10 backdrop-blur-sm shadow-md p-4 rounded-md">
-					<p><span class="bold">趣味</span><br>ゲーム (原神, スタレ, マイクラとか...)<br><br>旅行<br>プログラミング</p>
-					<p class="mt-3"><span class="font-semibold">年齢</span>
-						<br>
-						<span id="age-link" class="text-black bg-black rounded-sm cursor-pointer" onclick="revealAge()">14歳だよ</span>
-					  <span id="age-text" class="hidden">14歳だよ</span>
-					</p>
+					<p class="mt-3"><span class="font-semibold">趣味</span><br>ゲーム (原神, スタレ, マイクラとか...)<br>旅行<br>プログラミング</p>
 					<p class="mt-3"><span class="font-semibold">推しキャラ</span><br>放浪者 (原神)</p>
 					<p class="mt-3"><span class="font-semibold">触れる言語</span><br>PythonとJava、Kotlin、C#を少しだけ触れるよ</p>
 					<p class="mt-3"><span class="font-semibold">主な活動場所</span><br>Discord</p>
